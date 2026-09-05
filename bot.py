@@ -43,6 +43,12 @@ REMINDER_HOUR = int(os.environ.get("REMINDER_HOUR", "21"))
 REMINDER_MINUTE = int(os.environ.get("REMINDER_MINUTE", "0"))
 PERSISTENCE_PATH = os.environ.get("PERSISTENCE_PATH", "bot_persistence.pickle")
 
+# Render-ის (და მისნაირი) "Web Service" (უფასო) ტიპისთვის: Render ავტომატურად
+# აყენებს ამ ორ ცვლადს. თუ ისინი არსებობს, ბოტი გადადის webhook რეჟიმზე,
+# წინააღმდეგ შემთხვევაში (ლოკალურად) — ჩვეულებრივ polling რეჟიმზე.
+PORT = int(os.environ.get("PORT", "8080"))
+EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL", "").rstrip("/")
+
 
 # ---------- დამხმარე ფუნქციები ----------
 
@@ -366,8 +372,21 @@ def build_application() -> Application:
 
 def main():
     app = build_application()
-    logger.info("ბოტი გაეშვა (polling)...")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    if EXTERNAL_URL:
+        # "Web Service" რეჟიმი (მაგ. Render-ის უფასო tier-ი) — ბოტი უსმენს
+        # პორტს და Telegram თავად უგზავნის განახლებებს webhook-ით.
+        webhook_path = TOKEN
+        logger.info("ბოტი გაეშვა webhook რეჟიმში, პორტი %s", PORT)
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=PORT,
+            url_path=webhook_path,
+            webhook_url=f"{EXTERNAL_URL}/{webhook_path}",
+            allowed_updates=Update.ALL_TYPES,
+        )
+    else:
+        logger.info("ბოტი გაეშვა polling რეჟიმში (ლოკალური გაშვება)...")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
