@@ -6,7 +6,9 @@
 """
 import logging
 import os
+import threading
 from datetime import time as dtime, timedelta
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 try:
     from dotenv import load_dotenv
@@ -43,11 +45,36 @@ REMINDER_HOUR = int(os.environ.get("REMINDER_HOUR", "21"))
 REMINDER_MINUTE = int(os.environ.get("REMINDER_MINUTE", "0"))
 PERSISTENCE_PATH = os.environ.get("PERSISTENCE_PATH", "bot_persistence.pickle")
 
-# Render-ის (და მისნაირი) "Web Service" (უფასო) ტიპისთვის: Render ავტომატურად
-# აყენებს ამ ორ ცვლადს. თუ ისინი არსებობს, ბოტი გადადის webhook რეჟიმზე,
-# წინააღმდეგ შემთხვევაში (ლოკალურად) — ჩვეულებრივ polling რეჟიმზე.
+# Render-ის (და მისნაირი) "Web Service" (უფასო) ტიპს სჭირდება, რომ პროცესი
+# რაღაც პორტს უსმენდეს, თორემ ის ფიქრობს, რომ სერვისი "მკვდარია" და
+# თვითონვე შლის. ბოტი კი თავად მუშაობს polling-ით (Telegram-ს თავად ეკითხება
+# ახალ შეტყობინებებზე) და პორტი საერთოდ არ სჭირდება — ამიტომ უბრალოდ
+# ვუშვებთ პატარა, დამოუკიდებელ "საცნობარო" (health-check) სერვერს იმავე
+# პროცესში, ცალკე thread-ში, მხოლოდ იმისთვის, რომ Render დარწმუნდეს, რომ
+# პორტი ღიაა.
 PORT = int(os.environ.get("PORT", "8080"))
-EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL", "").rstrip("/")
+
+
+class _HealthCheckHandler(BaseHTTPRequestHandler):
+    """მხოლოდ იმისთვის, რომ Render-ის პორტის შემოწმება წარმატებული იყოს."""
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.end_headers()
+        self.wfile.write("ბოტი მუშაობს ✅".encode("utf-8"))
+
+    def log_message(self, format, *args):
+        pass  # რომ არ დაისვათ ლოგები ამ მოთხოვნებით
+
+
+def _start_health_server():
+    try:
+        server = HTTPServer(("0.0.0.0", PORT), _HealthCheckHandler)
+        logger.info("საცნობარო სერვერი გაეშვა 0.0.0.0:%s-ზე", PORT)
+        server.serve_forever()
+    except Exception:
+        logger.exception("საცნობარო სერვერის გაშვება ვერ მოხერხდა")
 
 
 # ---------- დამხმარე ფუნქციები ----------
@@ -372,21 +399,9 @@ def build_application() -> Application:
 
 def main():
     app = build_application()
-    if EXTERNAL_URL:
-        # "Web Service" რეჟიმი (მაგ. Render-ის უფასო tier-ი) — ბოტი უსმენს
-        # პორტს და Telegram თავად უგზავნის განახლებებს webhook-ით.
-        webhook_path = TOKEN
-        logger.info("ბოტი გაეშვა webhook რეჟიმში, პორტი %s", PORT)
-        app.run_webhook(
-            listen="0.0.0.0",
-            port=PORT,
-            url_path=webhook_path,
-            webhook_url=f"{EXTERNAL_URL}/{webhook_path}",
-            allowed_updates=Update.ALL_TYPES,
-        )
-    else:
-        logger.info("ბოტი გაეშვა polling რეჟიმში (ლოკალური გაშვება)...")
-        app.run_polling(allowed_updates=Update.ALL_TYPES)
+    threading.Thread(target=_start_health_server, daemon=True).start()
+    logger.info("ბოტი გაეშვა polling რეჟიმში...")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":
