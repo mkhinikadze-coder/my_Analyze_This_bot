@@ -112,6 +112,15 @@ def render_transcript(lang: str, qa_pairs: list[tuple[str, str]]) -> str:
     return "\n\n".join(lines)
 
 
+def render_transcript_plain(lang: str, qa_pairs: list[tuple[str, str]]) -> str:
+    """იგივე, მაგრამ Markdown-ის გარეშე — AI-ს პასუხთან შერევისას Telegram-ის
+    Markdown-პარსერი ადვილად იმტვრევა მოულოდნელი სიმბოლოებისგან."""
+    lines = []
+    for i, (q, a) in enumerate(qa_pairs, start=1):
+        lines.append(f"{i}. {q}\n{a}")
+    return "\n\n".join(lines)
+
+
 def question_keyboard(lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([[InlineKeyboardButton(T.BTN_SKIP[lang], callback_data="skip")]])
 
@@ -265,7 +274,7 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "save":
         session = context.user_data.get("last_session")
         if session:
-            transcript = render_transcript(lang, session["answers"])
+            transcript = render_transcript_plain(lang, session["answers"])
             body = f"{T.SAVED_HEADER[lang]}\n\n{transcript}"
             if session.get("ai_text"):
                 body += f"\n\n🤖 {session['ai_text']}"
@@ -353,17 +362,22 @@ async def _finalize(update: Update, context: ContextTypes.DEFAULT_TYPE, ai: bool
     stats = context.bot_data.setdefault("stats", {})
     stats[user_id] = stats.get(user_id, 0) + 1
 
+    transcript = render_transcript_plain(lang, session["answers"])
+
     if ai:
-        await query.message.edit_text(T.ANALYZING[lang])
+        await query.message.edit_text(f"{transcript}\n\n{T.ANALYZING[lang]}")
         prompt = T.build_ai_prompt(lang, session["answers"])
         ai_text = await get_ai_analysis(prompt)
         if ai_text is None:
-            await query.message.edit_text(T.AI_UNAVAILABLE[lang], reply_markup=finish_keyboard(lang))
+            await query.message.edit_text(
+                f"{transcript}\n\n{T.AI_UNAVAILABLE[lang]}",
+                reply_markup=finish_keyboard(lang),
+            )
             return
         session["ai_text"] = ai_text
-        final_text = ai_text + T.WILL_DELETE_SOON[lang]
+        final_text = f"{transcript}\n\n🤖 {ai_text}{T.WILL_DELETE_SOON[lang]}"
     else:
-        final_text = T.FINISHED_PLAIN[lang] + T.WILL_DELETE_SOON[lang]
+        final_text = f"{transcript}\n\n{T.FINISHED_PLAIN[lang]}{T.WILL_DELETE_SOON[lang]}"
 
     await query.message.edit_text(final_text, reply_markup=save_keyboard(lang))
 
