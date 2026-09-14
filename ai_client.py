@@ -34,7 +34,12 @@ async def get_ai_analysis(prompt: str) -> str | None:
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.8,
-            "maxOutputTokens": 500,
+            "maxOutputTokens": 1024,
+            # ახალ Gemini მოდელებს აქვთ "შიდა დაფიქრება" (thinking), რომელიც
+            # ხმარობს maxOutputTokens-ის ბიუჯეტს ხილული პასუხის დაწერამდე და
+            # პასუხს ხანდახან შუაზე ჭრის. ვთიშავთ, რომ მთელი ბიუჯეტი ხილულ
+            # ტექსტს მოხმარდეს.
+            "thinkingConfig": {"thinkingBudget": 0},
         },
     }
     headers = {
