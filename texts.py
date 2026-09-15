@@ -32,7 +32,7 @@ DELETE_NOTICE = {
           "to save it.",
 }
 
-BTN_START = {"ka": "▶️ დაწყება", "ru": "▶️ Начать", "en": "▶️ Start"}
+BTN_START = {"ka": "🔍 დაწყება", "ru": "🔍 Начать", "en": "🔍 Start"}
 BTN_SKIP = {"ka": "⏭ გამოტოვება", "ru": "⏭ Пропустить", "en": "⏭ Skip"}
 BTN_FINISH = {"ka": "✅ დასრულება", "ru": "✅ Завершить", "en": "✅ Finish"}
 BTN_AI = {"ka": "🤖 AI-ს ანალიზი", "ru": "🤖 Анализ от AI", "en": "🤖 AI Analysis"}
@@ -186,26 +186,43 @@ def build_ai_prompt(lang, qa_pairs):
         for i, (q, a) in enumerate(qa_pairs)
     )
 
-    return f"""You are giving warm, brief, supportive feedback on someone's daily personal
-self-reflection (a nightly moral inventory in the style of a 12-step recovery program's
-10th step, covering honesty, harm done, amends, gratitude, and self-kindness). Do NOT
-mention the 12-step program, "step 10", recovery programs, or any framework by name
-anywhere in your reply — the person should just feel gently guided, not analyzed
-through a labeled lens.
+    return f"""You are giving warm, thoughtful, genuinely perceptive feedback on someone's
+daily personal self-reflection (a nightly moral inventory in the style of a 12-step
+recovery program's 10th step, covering honesty, harm done, amends, gratitude, and
+self-kindness). Do NOT mention the 12-step program, "step 10", recovery programs, or
+any framework by name anywhere in your reply — the person should just feel genuinely
+seen and gently guided, not analyzed through a labeled lens.
 
 Here are today's questions and their answers:
 
 {qa_text}
 
-Write a short, warm reflection (roughly 120-180 words) that:
-- Notices real patterns in what they wrote, in a caring, non-clinical tone.
-- If any answers are self-critical or negative, reassures them that this is completely
-  normal, that change happens gradually, and that showing up to reflect honestly is
-  itself the important part — not getting every answer "right".
-- Gently highlights one concrete, small thing they could carry into tomorrow.
-- Ends on an encouraging, hopeful note.
-- Does not lecture, moralize, or diagnose. Do not use clinical or therapy-speak.
-- Do not use markdown headers or bullet lists — write it as flowing, warm prose.
+Write a reflection (roughly 220-280 words) with two parts:
+
+PART 1 — Reflection (most of the length):
+- Engage with what they ACTUALLY wrote, not generic categories. Reference at least two
+  of their specific answers directly enough that they'd recognize you actually read
+  them — a specific situation, feeling, or phrase they used, not a paraphrase of the
+  question itself.
+- Notice real patterns or connections across their answers (e.g., a link between what
+  they said about harm done and what they said about gratitude, or between honesty and
+  self-kindness) — something they might not have noticed themselves.
+- If any answers are self-critical or negative, reassure them this is completely
+  normal and that change happens gradually — but do this briefly, as one note among
+  several, not as the entire reflection. Avoid generic affirmations like "it's great
+  that you're reflecting" — assume that's already understood.
+
+PART 2 — One concrete direction for tomorrow (shorter, 2-4 sentences):
+- Give ONE specific, small, doable practice or action tied directly to something
+  specific they wrote today — not generic advice like "be kinder to yourself." Make it
+  concrete enough that they could actually do it tomorrow (a specific moment to pause,
+  a specific person to reach out to, a specific question to ask themselves, a specific
+  two-minute practice) — grounded in their actual answers, not a stock suggestion.
+
+Tone: warm, direct, perceptive — like someone who read closely and thought about it,
+not a form letter. Does not lecture, moralize, or diagnose. Do not use clinical or
+therapy-speak. Do not use markdown headers or bullet lists — write it as flowing prose,
+with a natural paragraph break between the two parts.
 
 {lang_instruction}
 """
