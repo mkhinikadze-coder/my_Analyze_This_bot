@@ -9,25 +9,16 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# -*- coding: utf-8 -*-
-"""
-თხოვნა Google Gemini API-ის უფასო tier-ისადმი (AI Studio API key, ბარათის გარეშე).
-"""
-import asyncio
-import os
-import logging
-import httpx
-
-logger = logging.getLogger(__name__)
-
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 # პირველად ის მოდელი ვცადოთ, რაც გარემოს ცვლადშია მითითებული (თუ არის),
 # შემდეგ კი, თუ ის გადატვირთულია/მიუწვდომელია, თანმიმდევრულად ვცადოთ
 # ეს სარეზერვო მოდელები — ასე ერთი მოდელის დროებითი გადატვირთვა აღარ
-# აჩერებს მთელ ანალიზს.
+# აჩერებს მთელ ანალიზს. ყველა აქ ჩამოთვლილი მოდელი აქტიურია Google-ის
+# მხრიდან 2026 წლის სექტემბრის მდგომარეობით (gemini-2.0-flash აღარ
+# გამოგვადგება — Google-მა ის უკვე გააუქმა).
 _PRIMARY_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-_FALLBACK_MODELS = ["gemini-flash-lite-latest", "gemini-2.0-flash"]
+_FALLBACK_MODELS = ["gemini-flash-lite-latest", "gemini-2.5-flash"]
 MODELS_TO_TRY = [_PRIMARY_MODEL] + [m for m in _FALLBACK_MODELS if m != _PRIMARY_MODEL]
 
 ATTEMPTS_PER_MODEL = 2
@@ -38,6 +29,21 @@ def _url_for(model: str) -> str:
     return f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 
 
+async def _post_once(url: str, payload: dict, headers: dict) -> str | None:
+    """ერთი მოთხოვნა — HTTP შეცდომებს ზემოთ (_try_model-ში) ვამუშავებთ."""
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(url, json=payload, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+        candidates = data.get("candidates", [])
+        if not candidates:
+            logger.error("Gemini-მ არაფერი დააბრუნა: %s", data)
+            return None
+        parts = candidates[0].get("content", {}).get("parts", [])
+        text = "".join(p.get("text", "") for p in parts).strip()
+        return text or None
+
+
 async def _try_model(model: str, payload: dict, headers: dict) -> str | None:
     """ცდილობს ერთ კონკრეტულ მოდელს, საჭიროებისამებრ რამდენჯერმე. აბრუნებს
     ტექსტს წარმატების შემთხვევაში, ან None თუ ეს მოდელი საბოლოოდ ჩავარდა."""
@@ -46,17 +52,7 @@ async def _try_model(model: str, payload: dict, headers: dict) -> str | None:
 
     for attempt in range(1, ATTEMPTS_PER_MODEL + 1):
         try:
-            async with httpx.AsyncClient(timeout=30) as client:
-                resp = await client.post(url, json=payload, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-                candidates = data.get("candidates", [])
-                if not candidates:
-                    logger.error("Gemini (%s)-მ არაფერი დააბრუნა: %s", model, data)
-                    return None
-                parts = candidates[0].get("content", {}).get("parts", [])
-                text = "".join(p.get("text", "") for p in parts).strip()
-                return text or None
+            return await _post_once(url, payload, headers)
 
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
@@ -99,16 +95,16 @@ async def get_ai_analysis(prompt: str) -> str | None:
         logger.error("GEMINI_API_KEY არ არის დაყენებული")
         return None
 
+    # შენიშვნა: შეგნებულად აღარ ვგზავნით "thinkingConfig" პარამეტრს — სხვადასხვა
+    # Gemini მოდელს განსხვავებული, ხშირად შეუთავსებელი ფორმატი აქვს ამისთვის
+    # (budget/level/include_thoughts), რაც უამრავ "400 Bad Request"-ს იწვევდა.
+    # სამაგიეროდ, უბრალოდ საკმარისად დიდი maxOutputTokens ვაძლევთ, რომ შიდა
+    # "დაფიქრებამაც" და ხილულმა პასუხმაც ადგილი დატოვოს.
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.8,
-            "maxOutputTokens": 1024,
-            # ახალ Gemini მოდელებს აქვთ "შიდა დაფიქრება" (thinking), რომელიც
-            # ხმარობს maxOutputTokens-ის ბიუჯეტს ხილული პასუხის დაწერამდე და
-            # პასუხს ხანდახან შუაზე ჭრის. ვთიშავთ, რომ მთელი ბიუჯეტი ხილულ
-            # ტექსტს მოხმარდეს.
-            "thinkingConfig": {"thinkingBudget": 0},
+            "maxOutputTokens": 2048,
         },
     }
     headers = {
