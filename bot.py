@@ -64,6 +64,14 @@ class _HealthCheckHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write("ბოტი მუშაობს ✅".encode("utf-8"))
 
+    def do_HEAD(self):
+        # UptimeRobot-ის HTTP(s) მონიტორი HEAD მოთხოვნებს იყენებს — ამის
+        # გარეშე BaseHTTPRequestHandler უბრალოდ 501-ს აბრუნებს და
+        # UptimeRobot ფიქრობს, რომ ბოტი "Down"-ია.
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.end_headers()
+
     def log_message(self, format, *args):
         pass  # რომ არ დაისვათ ლოგები ამ მოთხოვნებით
 
