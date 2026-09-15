@@ -6,6 +6,7 @@
 """
 import logging
 import os
+import random
 import threading
 from datetime import time as dtime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -41,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 DELETE_AFTER_SECONDS = 15 * 60  # 15 წუთი
+RANDOM_QUESTION_COUNT = 7  # "🎯 შერჩევითი კითხვები" რეჟიმზე რამდენი აირჩევა 46-დან
 REMINDER_HOUR = int(os.environ.get("REMINDER_HOUR", "21"))
 REMINDER_MINUTE = int(os.environ.get("REMINDER_MINUTE", "0"))
 PERSISTENCE_PATH = os.environ.get("PERSISTENCE_PATH", "bot_persistence.pickle")
@@ -108,6 +110,7 @@ def welcome_keyboard(lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [InlineKeyboardButton(T.BTN_START[lang], callback_data="start_analysis")],
+            [InlineKeyboardButton(T.BTN_RANDOM[lang], callback_data="start_random")],
             [InlineKeyboardButton(T.BTN_LANG_CHANGE[lang], callback_data="show_lang")],
         ]
     )
@@ -147,9 +150,10 @@ def save_keyboard(lang: str) -> InlineKeyboardMarkup:
 async def send_question_view(update_msg, lang: str, session: dict):
     """ბოტის ერთი შეტყობინების რედაქტირება: ისტორია + შემდეგი კითხვა + Skip."""
     qidx = session["current_q"]
+    total = len(session["questions"])
     transcript = render_transcript(lang, session["answers"])
-    q_label = T.progress_label(lang, qidx + 1)
-    question = T.QUESTIONS[lang][qidx]
+    q_label = T.progress_label(lang, qidx + 1, total)
+    question = session["questions"][qidx]
     parts = []
     if transcript:
         parts.append(transcript)
@@ -275,6 +279,21 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "user_msg_ids": [],
             "chat_id": query.message.chat_id,
             "ai_text": None,
+            "questions": list(T.QUESTIONS[lang]),
+        }
+        context.user_data["awaiting_answer"] = True
+        await send_question_view(query.message, lang, context.user_data["session"])
+        return
+
+    if data == "start_random":
+        context.user_data["session"] = {
+            "answers": [],
+            "current_q": 0,
+            "bot_msg_id": query.message.message_id,
+            "user_msg_ids": [],
+            "chat_id": query.message.chat_id,
+            "ai_text": None,
+            "questions": random.sample(T.RANDOM_POOL[lang], RANDOM_QUESTION_COUNT),
         }
         context.user_data["awaiting_answer"] = True
         await send_question_view(query.message, lang, context.user_data["session"])
@@ -339,7 +358,7 @@ async def _record_answer(update: Update, context: ContextTypes.DEFAULT_TYPE, ans
         return
     lang = get_lang(context) or "ka"
     qidx = session["current_q"]
-    question = T.QUESTIONS[lang][qidx]
+    question = session["questions"][qidx]
     session["answers"].append((question, answer_text))
 
     if not via_callback:
@@ -364,7 +383,7 @@ async def _record_answer(update: Update, context: ContextTypes.DEFAULT_TYPE, ans
 
     proxy = _MsgProxy()
 
-    if session["current_q"] < 9:
+    if session["current_q"] < len(session["questions"]):
         await send_question_view(proxy, lang, session)
     else:
         context.user_data["awaiting_answer"] = False
