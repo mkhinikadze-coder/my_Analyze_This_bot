@@ -14,11 +14,14 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 # პირველად ის მოდელი ვცადოთ, რაც გარემოს ცვლადშია მითითებული (თუ არის),
 # შემდეგ კი, თუ ის გადატვირთულია/მიუწვდომელია, თანმიმდევრულად ვცადოთ
 # ეს სარეზერვო მოდელები — ასე ერთი მოდელის დროებითი გადატვირთვა აღარ
-# აჩერებს მთელ ანალიზს. ყველა აქ ჩამოთვლილი მოდელი აქტიურია Google-ის
-# მხრიდან 2026 წლის სექტემბრის მდგომარეობით (gemini-2.0-flash აღარ
-# გამოგვადგება — Google-მა ის უკვე გააუქმა).
-_PRIMARY_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
-_FALLBACK_MODELS = ["gemini-flash-lite-latest", "gemini-2.5-flash"]
+# აჩერებს მთელ ანალიზს.
+#
+# შენიშვნა: "gemini-flash-latest" ალიასი Google-ის საკუთარი დოკუმენტაციით
+# ექსპერიმენტულია და გააჩნია გაცილებით მკაცრი ლიმიტები (ამიტომაც გვიბრუნებდა
+# ხშირად 503-ს) — ამიტომ ძირითადად კონკრეტულ, სტაბილურ Gemini 3.x მოდელებს
+# ვეყრდნობით, "-latest" ალიასს კი მხოლოდ ბოლო სარეზერვო ვარიანტად ვტოვებთ.
+_PRIMARY_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+_FALLBACK_MODELS = ["gemini-3.1-flash-lite", "gemini-flash-latest"]
 MODELS_TO_TRY = [_PRIMARY_MODEL] + [m for m in _FALLBACK_MODELS if m != _PRIMARY_MODEL]
 
 ATTEMPTS_PER_MODEL = 2
