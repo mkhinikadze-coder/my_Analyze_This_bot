@@ -168,11 +168,24 @@ async def send_final_choice_view(bot_msg, lang: str, session: dict):
 async def delete_job(context: ContextTypes.DEFAULT_TYPE):
     data = context.job.data
     chat_id = data["chat_id"]
+    lang = data.get("lang", "ka")
     for mid in data["message_ids"]:
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=mid)
         except TelegramError:
             pass
+    # წაშლის შემდეგ ცარიელ ჩატს არ ვტოვებთ — ვაგზავნით ახალ, მუდმივ
+    # მისალმების შეტყობინებას "დაწყება" ღილაკით, რომ აღარც ტელეგრამის
+    # "Start" ღილაკზე ვიყოთ დამოკიდებული და ხელითაც აღარ დასჭირდეს წერა.
+    try:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=welcome_text(lang),
+            reply_markup=welcome_keyboard(lang),
+            parse_mode=ParseMode.MARKDOWN,
+        )
+    except TelegramError:
+        logger.warning("წაშლის შემდეგ მისალმების გაგზავნა ვერ მოხერხდა chat_id=%s-სთვის", chat_id)
 
 
 async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
@@ -185,11 +198,11 @@ async def reminder_job(context: ContextTypes.DEFAULT_TYPE):
         logger.warning("შეხსენების გაგზავნა ვერ მოხერხდა chat_id=%s-სთვის", chat_id)
 
 
-def schedule_delete(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_ids: list[int]):
+def schedule_delete(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_ids: list[int], lang: str):
     context.job_queue.run_once(
         delete_job,
         when=timedelta(seconds=DELETE_AFTER_SECONDS),
-        data={"chat_id": chat_id, "message_ids": message_ids},
+        data={"chat_id": chat_id, "message_ids": message_ids, "lang": lang},
         name=f"delete_{chat_id}_{message_ids[0]}",
     )
 
@@ -391,7 +404,7 @@ async def _finalize(update: Update, context: ContextTypes.DEFAULT_TYPE, ai: bool
 
     context.user_data["last_session"] = session
     all_msg_ids = [session["bot_msg_id"]] + session["user_msg_ids"]
-    schedule_delete(context, session["chat_id"], all_msg_ids)
+    schedule_delete(context, session["chat_id"], all_msg_ids, lang)
 
     context.user_data.pop("session", None)
     context.user_data["awaiting_answer"] = False
