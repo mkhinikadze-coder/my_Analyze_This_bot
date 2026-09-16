@@ -144,7 +144,12 @@ def finish_keyboard(lang: str) -> InlineKeyboardMarkup:
 
 
 def save_keyboard(lang: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([[InlineKeyboardButton(T.BTN_SAVE[lang], callback_data="save")]])
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton(T.BTN_SAVE[lang], callback_data="save")],
+            [InlineKeyboardButton(T.BTN_FINISH[lang], callback_data="close_now")],
+        ]
+    )
 
 
 async def send_question_view(update_msg, lang: str, session: dict):
@@ -320,6 +325,30 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 body += f"\n\n🤖 {session['ai_text']}"
             await context.bot.send_message(chat_id=session["chat_id"], text=body)
             await query.answer(T.SAVED_CONFIRM[lang], show_alert=True)
+        return
+
+    if data == "close_now":
+        session = context.user_data.get("last_session")
+        if session:
+            chat_id = session["chat_id"]
+            msg_ids = [session["bot_msg_id"]] + session["user_msg_ids"]
+            # ვაუქმებთ დაგეგმილ (15-წუთიან) ავტომატურ წაშლას, რადგან ახლავე,
+            # ხელით ვასრულებთ იმავე მოქმედებას.
+            job_name = f"delete_{chat_id}_{msg_ids[0]}"
+            for j in context.job_queue.get_jobs_by_name(job_name):
+                j.schedule_removal()
+            for mid in msg_ids:
+                try:
+                    await context.bot.delete_message(chat_id=chat_id, message_id=mid)
+                except TelegramError:
+                    pass
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=welcome_text(lang),
+                reply_markup=welcome_keyboard(lang),
+                parse_mode=ParseMode.MARKDOWN,
+            )
+            context.user_data.pop("last_session", None)
         return
 
     if data == "toggle_reminder":
