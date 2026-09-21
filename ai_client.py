@@ -107,7 +107,7 @@ async def get_ai_analysis(prompt: str) -> str | None:
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.8,
-            "maxOutputTokens": 2048,
+                        "maxOutputTokens": 8192,
         },
     }
     headers = {
