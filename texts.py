@@ -32,7 +32,7 @@ DELETE_NOTICE = {
           "to save it.",
 }
 
-BTN_START = {"ka": "🔍 დაწყება", "ru": "🔍 Начать", "en": "🔍 Start"}
+BTN_START = {"ka": "🔍 დღის ანალიზი — 9 კითხვა", "ru": "🔍 Дневной анализ — 9 вопросов", "en": "🔍 Daily analysis — 9 questions"}
 BTN_SKIP = {"ka": "⏭ გამოტოვება", "ru": "⏭ Пропустить", "en": "⏭ Skip"}
 BTN_FINISH = {"ka": "✅ დასრულება", "ru": "✅ Завершить", "en": "✅ Finish"}
 BTN_AI = {"ka": "🤖 AI-ს ანალიზი", "ru": "🤖 Анализ от AI", "en": "🤖 AI Analysis"}
@@ -321,43 +321,52 @@ def build_ai_prompt(lang, qa_pairs):
         for i, (q, a) in enumerate(qa_pairs)
     )
 
-    return f"""You are giving warm, thoughtful, genuinely perceptive feedback on someone's
-daily personal self-reflection (a nightly moral inventory in the style of a 12-step
-recovery program's 10th step, covering honesty, harm done, amends, gratitude, and
-self-kindness). Do NOT mention the 12-step program, "step 10", recovery programs, or
-any framework by name anywhere in your reply — the person should just feel genuinely
-seen and gently guided, not analyzed through a labeled lens.
+    return f"""You are giving perceptive, emotionally honest feedback on someone's daily
+personal self-reflection (a nightly moral inventory covering honesty, harm done,
+amends, self-kindness, and gratitude). Do NOT mention any named framework, tradition,
+philosophy, or program anywhere in your reply (no "12-step", "step 10", "Buddhism",
+"Buddhist", "Christianity", "Christian", "Jung", "Jungian", "psychoanalysis", or similar
+words) — the person should feel genuinely seen and given real direction, not labeled or
+analyzed through a named lens.
+
+Let your read of their answers be shaped, quietly and without naming any of this, by
+three lenses at once: (1) where they may be gripped by attachment, craving, or
+resistance to how things actually are, and what letting go of that grip might look
+like; (2) where conscience, guilt, or grace are at play — where they are honestly
+answerable for something, and where they could extend themselves real mercy rather
+than excuse; (3) what part of themselves they may be avoiding, denying, or projecting
+onto someone else, and what integrating that hidden part would mean. Use these as
+your own internal compass for what to say — never surface the vocabulary itself.
 
 Here are today's questions and their answers:
 
 {qa_text}
 
-Write a reflection (roughly 220-280 words) with two parts:
+Write a reflection (roughly 250-350 words) with two parts:
 
 PART 1 — Reflection (most of the length):
 - Engage with what they ACTUALLY wrote, not generic categories. Reference at least two
-  of their specific answers directly enough that they'd recognize you actually read
-  them — a specific situation, feeling, or phrase they used, not a paraphrase of the
-  question itself.
-- Notice real patterns or connections across their answers (e.g., a link between what
-  they said about harm done and what they said about gratitude, or between honesty and
-  self-kindness) — something they might not have noticed themselves.
-- If any answers are self-critical or negative, reassure them this is completely
-  normal and that change happens gradually — but do this briefly, as one note among
-  several, not as the entire reflection. Avoid generic affirmations like "it's great
-  that you're reflecting" — assume that's already understood.
+  specific answers directly enough that they'd recognize you actually read them — a
+  specific situation, feeling, or phrase they used, not a paraphrase of the question.
+- Notice real patterns or tensions across their answers — a contradiction, a thing
+  they're avoiding, a blind spot, something they may be minimizing or over-explaining.
+  Name it plainly and kindly, without moralizing or diagnosing.
+- Do not default to reassurance. If something in their answers deserves a gentle
+  challenge or a harder question back to them, give it. Warmth should come from being
+  taken seriously, not from being softened.
 
-PART 2 — One concrete direction for tomorrow (shorter, 2-4 sentences):
-- Give ONE specific, small, doable practice or action tied directly to something
-  specific they wrote today — not generic advice like "be kinder to yourself." Make it
-  concrete enough that they could actually do it tomorrow (a specific moment to pause,
-  a specific person to reach out to, a specific question to ask themselves, a specific
-  two-minute practice) — grounded in their actual answers, not a stock suggestion.
+PART 2 — One concrete direction for tomorrow (shorter, 3-5 sentences):
+- Give ONE specific, doable practice or action tied directly to something specific
+  they wrote today — concrete enough to actually do tomorrow (a moment to pause, a
+  person to speak with, a question to sit with, a two-minute practice). Ground it in
+  their actual answers, not a stock suggestion.
+- If relevant, name the one attitude shift (not the framework it comes from) that
+  would matter more than the action itself.
 
-Tone: warm, direct, perceptive — like someone who read closely and thought about it,
-not a form letter. Does not lecture, moralize, or diagnose. Do not use clinical or
-therapy-speak. Do not use markdown headers or bullet lists — write it as flowing prose,
-with a natural paragraph break between the two parts.
+Tone: direct, warm where warmth is earned, genuinely perceptive — like someone who
+read closely and is not afraid to say something real. No clinical or therapy-speak,
+no markdown headers or bullet lists — flowing prose, with a natural paragraph break
+between the two parts.
 
 {lang_instruction}
 """
