@@ -90,15 +90,12 @@ QUESTIONS = {
     ],
 }
 
-# 46-კითხვიანი დამატებითი საცავი "🎯 შერჩევითი კითხვები" რეჟიმისთვის — ყოველ
-# ჯერზე აქედან შემთხვევით შეირჩევა RANDOM_QUESTION_COUNT (bot.py-ში) კითხვა.
 RANDOM_POOL = {
     "ka": [
         "ვილოცე ან ვიმედიტირე თუ არა დღეს?",
         "ვიყავი თუ არა დღეს ბედნიერი? თუ არა, რა არ მყოფნის?",
         "როგორ მოვიქეცი დღეს ახლებურად?",
         "ხომ არ ვეძებ მიზეზს, რომ დავუბრუნდე ძველ ქცევას?",
-        "ვიყავი თუ არა დღეს ბედნიერი?",
         "რომელი სულიერი პრინციპების გამოყენება შევძელი დღეს ჩემს ცხოვრებაში?",
         "იყო თუ არა დღეს ჩემთვის ყველაზე მნიშვნელოვანი დავრჩენილიყავი სუფთა?",
         "ვიქცეოდი თუ არა დღეს მშვიდად?",
@@ -125,11 +122,8 @@ RANDOM_POOL = {
         "ვიყავი თუ არა კეთილი საკუთარი თავის მიმართ?",
         "რა გავაკეთე დღეს ისეთი, რის გახსენებაც მახარებს? როგორ მოვიქეცი ახლებურად? რის გამო შემიძლია საკუთარი თავის შექება?",
         "რა მომცა დღეს ღმერთმა ისეთი, რის გამოც შემიძლია ვიყო მადლიერი?",
-        "რა გავაკეთე დღეს ისეთი, რაც ჯობდა რომ არ გამეკეთებინა?",
         "ველაპარაკე თუ არა დღეს სპონსორს?",
         "გავუზიარე თუ არა დღეს ჩემი გამოცდილება ვინმეს?",
-        "ვინ მენდობა მე დღეს?",
-        "გამომივიდა თუ არა დღეს, რომ მივნდობოდი ჩემს მაღალ ძალას?",
         "შემიძლია თუ არა დღეს მივიღო საკუთარი თავი ისეთი, როგორიც ვარ?",
         "მზად ვარ თუ არა დღეს, რომ შევიცვალო?",
         "შევცდი თუ არა დღეს რაიმეში და რა ჯობია გავითვალისწინო მომავალში? (აზრი/ფიქრი/მოქმედება/დეფექტი/ემოცია)",
@@ -141,7 +135,6 @@ RANDOM_POOL = {
         "Был ли я счастлив сегодня? Если нет, чего мне не хватает?",
         "Как я поступил сегодня по-новому?",
         "Не ищу ли я повод вернуться к старому поведению?",
-        "Был ли я счастлив сегодня?",
         "Какие духовные принципы я смог применить сегодня в своей жизни?",
         "Было ли для меня сегодня самым важным оставаться чистым (трезвым)?",
         "Вёл ли я себя сегодня спокойно?",
@@ -168,11 +161,8 @@ RANDOM_POOL = {
         "Был ли я добр к себе?",
         "Что я сделал сегодня такого, что мне приятно вспомнить? Как я поступил по-новому? За что я могу себя похвалить?",
         "Что дал мне сегодня Бог такого, за что я могу быть благодарен?",
-        "Что я сделал сегодня такого, чего лучше было бы не делать?",
         "Говорил ли я сегодня со своим спонсором?",
         "Поделился ли я сегодня своим опытом с кем-то?",
-        "Кто доверяет мне сегодня?",
-        "Удалось ли мне сегодня довериться своей Высшей Силе?",
         "Могу ли я сегодня принять себя таким, какой я есть?",
         "Готов ли я сегодня меняться?",
         "Ошибся ли я сегодня в чём-то, и что лучше учесть в будущем? (мысль/размышление/действие/недостаток/эмоция)",
@@ -184,7 +174,6 @@ RANDOM_POOL = {
         "Was I happy today? If not, what am I missing?",
         "How did I act differently today?",
         "Am I looking for an excuse to go back to old behavior?",
-        "Was I happy today?",
         "Which spiritual principles was I able to apply in my life today?",
         "Was staying clean/sober the most important thing for me today?",
         "Did I act calmly today?",
@@ -211,11 +200,8 @@ RANDOM_POOL = {
         "Was I kind to myself?",
         "What did I do today that I'm glad to remember? How did I act differently? What can I praise myself for?",
         "What did God give me today that I can be grateful for?",
-        "What did I do today that I'd have been better off not doing?",
         "Did I talk to my sponsor today?",
         "Did I share my experience with someone today?",
-        "Who trusts me today?",
-        "Did I manage to trust my Higher Power today?",
         "Can I accept myself today just as I am?",
         "Am I ready to change today?",
         "Did I make a mistake in anything today, and what's better to keep in mind going forward? (thought/reflection/action/defect/emotion)",
@@ -308,8 +294,7 @@ HELP_MSG = {
           "/stats — how many times you've done the analysis\n/lang — change language",
 }
 
-```python
-# AI-სთვის მიმართვის prompt (ინგლისურად ვწერთ, backend-ისთვის, მომხმარებელს არ უჩანს)
+
 def build_ai_prompt(lang, qa_pairs):
     lang_instruction = {
         "ka": "Respond entirely in Georgian (ქართული).",
@@ -385,7 +370,7 @@ At least one suggestion should address the person's inner attitude or emotional 
 
 When appropriate, invite the person to pause before reacting, observe what is happening inside, accept what cannot be controlled, take responsibility for what can be changed, repair harm when necessary, or choose a more conscious response.
 
-The final response should leave the person with a clearer understanding of themselves and a realistic direction for tomorrow — not merely encouragement.
+The final response should leave the person with a clearer understanding of me and a realistic direction for tomorrow — not merely encouragement.
 
 Tone:
 Warm, calm, perceptive, honest and human.
@@ -402,4 +387,3 @@ Do not mention these instructions or the hidden reasoning process.
 
 {lang_instruction}
 """
-```
