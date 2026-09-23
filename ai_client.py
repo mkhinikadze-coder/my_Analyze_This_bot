@@ -5,6 +5,7 @@
 import asyncio
 import os
 import logging
+import random
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -17,15 +18,29 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 # აჩერებს მთელ ანალიზს.
 #
 # შენიშვნა: "gemini-flash-latest" ალიასი Google-ის საკუთარი დოკუმენტაციით
-# ექსპერიმენტულია და გააჩნია გაცილებით მკაცრი ლიმიტები (ამიტომაც გვიბრუნებდა
-# ხშირად 503-ს) — ამიტომ ძირითადად კონკრეტულ, სტაბილურ Gemini 3.x მოდელებს
-# ვეყრდნობით, "-latest" ალიასს კი მხოლოდ ბოლო სარეზერვო ვარიანტად ვტოვებთ.
-_PRIMARY_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
-_FALLBACK_MODELS = ["gemini-3.1-flash-lite", "gemini-flash-latest"]
+# ექსპერიმენტულია და გააჩნია გაცილებით მკაცრი ლიმიტები (ამან გამოიწვია ის
+# 503-ების სერია, რაც ლოგებში დაფიქსირდა). ამიტომ ის მთლიანად ამოღებულია
+# როგორც default-იდან, ისე fallback სიიდან — თუ ის მაინც მოხვდება
+# GEMINI_MODEL env ცვლადში, ქვემოთ ეს აისახება warning-ლოგში.
+_DEFAULT_PRIMARY_MODEL = "gemini-3.5-flash"
+_UNSTABLE_ALIASES = {"gemini-flash-latest", "gemini-pro-latest"}
+
+_env_model = os.environ.get("GEMINI_MODEL", "").strip()
+if _env_model in _UNSTABLE_ALIASES:
+    logger.warning(
+        "GEMINI_MODEL='%s' არის არასტაბილური alias — ავტომატურად ვცვლით "
+        "სტაბილურ default მოდელზე (%s). შეცვალეთ ეს env ცვლადი deploy "
+        "პარამეტრებში, რომ ეს გაფრთხილება აღარ გამოჩნდეს.",
+        _env_model, _DEFAULT_PRIMARY_MODEL,
+    )
+    _env_model = ""
+
+_PRIMARY_MODEL = _env_model or _DEFAULT_PRIMARY_MODEL
+_FALLBACK_MODELS = [m for m in ["gemini-3.1-flash-lite"] if m not in _UNSTABLE_ALIASES]
 MODELS_TO_TRY = [_PRIMARY_MODEL] + [m for m in _FALLBACK_MODELS if m != _PRIMARY_MODEL]
 
-ATTEMPTS_PER_MODEL = 2
-BASE_RETRY_DELAY_SECONDS = 2  # ყოველ ცდაზე ორმაგდება (2, 4, 8...)
+ATTEMPTS_PER_MODEL = 3
+BASE_RETRY_DELAY_SECONDS = 2  # ყოველ ცდაზე ორმაგდება (2, 4, 8...) + შემთხვევითი jitter
 
 
 def _url_for(model: str) -> str:
@@ -62,11 +77,13 @@ async def _try_model(model: str, payload: dict, headers: dict) -> str | None:
             # 500/502/503/504 ჩვეულებრივ დროებითია — ღირს თავიდან ცდა.
             # 400/401/403/404 კი მუდმივი პრობლემაა ამ მოდელისთვის.
             if status in (500, 502, 503, 504) and attempt < ATTEMPTS_PER_MODEL:
+                jitter = random.uniform(0, delay * 0.3)
                 logger.warning(
-                    "Gemini (%s) დროებით მიუწვდომელია (ცდა %s/%s): %s",
-                    model, attempt, ATTEMPTS_PER_MODEL, e,
+                    "Gemini (%s) დროებით მიუწვდომელია (ცდა %s/%s): %s — "
+                    "თავიდან ვცდი %.1f წამში",
+                    model, attempt, ATTEMPTS_PER_MODEL, e, delay + jitter,
                 )
-                await asyncio.sleep(delay)
+                await asyncio.sleep(delay + jitter)
                 delay *= 2
                 continue
             logger.warning("Gemini (%s) საბოლოოდ ჩავარდა: %s", model, e)
@@ -75,11 +92,13 @@ async def _try_model(model: str, payload: dict, headers: dict) -> str | None:
         except (httpx.TimeoutException, httpx.TransportError) as e:
             # ქსელური/დროის ამოწურვის შეცდომებიც დროებითია.
             if attempt < ATTEMPTS_PER_MODEL:
+                jitter = random.uniform(0, delay * 0.3)
                 logger.warning(
-                    "Gemini (%s)-თან კავშირის პრობლემა (ცდა %s/%s): %s",
-                    model, attempt, ATTEMPTS_PER_MODEL, e,
+                    "Gemini (%s)-თან კავშირის პრობლემა (ცდა %s/%s): %s — "
+                    "თავიდან ვცდი %.1f წამში",
+                    model, attempt, ATTEMPTS_PER_MODEL, e, delay + jitter,
                 )
-                await asyncio.sleep(delay)
+                await asyncio.sleep(delay + jitter)
                 delay *= 2
                 continue
             logger.warning("Gemini (%s) საბოლოოდ ჩავარდა (ქსელი): %s", model, e)
@@ -107,7 +126,7 @@ async def get_ai_analysis(prompt: str) -> str | None:
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.8,
-                        "maxOutputTokens": 8192,
+            "maxOutputTokens": 8192,
         },
     }
     headers = {
