@@ -90,12 +90,15 @@ QUESTIONS = {
     ],
 }
 
+# 41-კითხვიანი დამატებითი საცავი "🎯 შერჩევითი 7 კითხვა" რეჟიმისთვის — ყოველ
+# ჯერზე აქედან შემთხვევით შეირჩევა RANDOM_QUESTION_COUNT (bot.py-ში) კითხვა.
 RANDOM_POOL = {
     "ka": [
         "ვილოცე ან ვიმედიტირე თუ არა დღეს?",
         "ვიყავი თუ არა დღეს ბედნიერი? თუ არა, რა არ მყოფნის?",
         "როგორ მოვიქეცი დღეს ახლებურად?",
         "ხომ არ ვეძებ მიზეზს, რომ დავუბრუნდე ძველ ქცევას?",
+        "ვიყავი თუ არა დღეს ბედნიერი?",
         "რომელი სულიერი პრინციპების გამოყენება შევძელი დღეს ჩემს ცხოვრებაში?",
         "იყო თუ არა დღეს ჩემთვის ყველაზე მნიშვნელოვანი დავრჩენილიყავი სუფთა?",
         "ვიქცეოდი თუ არა დღეს მშვიდად?",
@@ -122,8 +125,11 @@ RANDOM_POOL = {
         "ვიყავი თუ არა კეთილი საკუთარი თავის მიმართ?",
         "რა გავაკეთე დღეს ისეთი, რის გახსენებაც მახარებს? როგორ მოვიქეცი ახლებურად? რის გამო შემიძლია საკუთარი თავის შექება?",
         "რა მომცა დღეს ღმერთმა ისეთი, რის გამოც შემიძლია ვიყო მადლიერი?",
+        "რა გავაკეთე დღეს ისეთი, რაც ჯობდა რომ არ გამეკეთებინა?",
         "ველაპარაკე თუ არა დღეს სპონსორს?",
         "გავუზიარე თუ არა დღეს ჩემი გამოცდილება ვინმეს?",
+        "ვინ მენდობა მე დღეს?",
+        "გამომივიდა თუ არა დღეს, რომ მივნდობოდი ჩემს მაღალ ძალას?",
         "შემიძლია თუ არა დღეს მივიღო საკუთარი თავი ისეთი, როგორიც ვარ?",
         "მზად ვარ თუ არა დღეს, რომ შევიცვალო?",
         "შევცდი თუ არა დღეს რაიმეში და რა ჯობია გავითვალისწინო მომავალში? (აზრი/ფიქრი/მოქმედება/დეფექტი/ემოცია)",
@@ -135,6 +141,7 @@ RANDOM_POOL = {
         "Был ли я счастлив сегодня? Если нет, чего мне не хватает?",
         "Как я поступил сегодня по-новому?",
         "Не ищу ли я повод вернуться к старому поведению?",
+        "Был ли я счастлив сегодня?",
         "Какие духовные принципы я смог применить сегодня в своей жизни?",
         "Было ли для меня сегодня самым важным оставаться чистым (трезвым)?",
         "Вёл ли я себя сегодня спокойно?",
@@ -161,8 +168,11 @@ RANDOM_POOL = {
         "Был ли я добр к себе?",
         "Что я сделал сегодня такого, что мне приятно вспомнить? Как я поступил по-новому? За что я могу себя похвалить?",
         "Что дал мне сегодня Бог такого, за что я могу быть благодарен?",
+        "Что я сделал сегодня такого, чего лучше было бы не делать?",
         "Говорил ли я сегодня со своим спонсором?",
         "Поделился ли я сегодня своим опытом с кем-то?",
+        "Кто доверяет мне сегодня?",
+        "Удалось ли мне сегодня довериться своей Высшей Силе?",
         "Могу ли я сегодня принять себя таким, какой я есть?",
         "Готов ли я сегодня меняться?",
         "Ошибся ли я сегодня в чём-то, и что лучше учесть в будущем? (мысль/размышление/действие/недостаток/эмоция)",
@@ -174,6 +184,7 @@ RANDOM_POOL = {
         "Was I happy today? If not, what am I missing?",
         "How did I act differently today?",
         "Am I looking for an excuse to go back to old behavior?",
+        "Was I happy today?",
         "Which spiritual principles was I able to apply in my life today?",
         "Was staying clean/sober the most important thing for me today?",
         "Did I act calmly today?",
@@ -200,8 +211,11 @@ RANDOM_POOL = {
         "Was I kind to myself?",
         "What did I do today that I'm glad to remember? How did I act differently? What can I praise myself for?",
         "What did God give me today that I can be grateful for?",
+        "What did I do today that I'd have been better off not doing?",
         "Did I talk to my sponsor today?",
         "Did I share my experience with someone today?",
+        "Who trusts me today?",
+        "Did I manage to trust my Higher Power today?",
         "Can I accept myself today just as I am?",
         "Am I ready to change today?",
         "Did I make a mistake in anything today, and what's better to keep in mind going forward? (thought/reflection/action/defect/emotion)",
@@ -294,7 +308,7 @@ HELP_MSG = {
           "/stats — how many times you've done the analysis\n/lang — change language",
 }
 
-
+# AI-სთვის მიმართვის prompt (ინგლისურად ვწერთ, backend-ისთვის, მომხმარებელს არ უჩანს)
 def build_ai_prompt(lang, qa_pairs):
     lang_instruction = {
         "ka": "Respond entirely in Georgian (ქართული).",
@@ -307,83 +321,66 @@ def build_ai_prompt(lang, qa_pairs):
         for i, (q, a) in enumerate(qa_pairs)
     )
 
-    return f"""You are providing a deep, humane and honest reflection on someone's daily self-reflection.
+    return f"""You are giving perceptive, warm, and genuinely useful feedback on someone's
+daily personal self-reflection (a nightly moral inventory covering honesty, harm done,
+amends, self-kindness, and gratitude). Do NOT mention any named framework, tradition,
+philosophy, or program anywhere in your reply (no "12-step", "step 10", "Buddhism",
+"Buddhist", "Christianity", "Christian", "Jung", "Jungian", "psychoanalysis", "shadow",
+"ego", or similar words) — the person should feel genuinely seen and given real,
+practical direction, not labeled or analyzed through a named lens.
 
-Your task is NOT simply to summarize their answers. Read between the lines and help the person understand what may be happening inside them, while staying grounded in what they actually wrote.
+Let your read of their answers be shaped, quietly and without ever naming any of this,
+by three lenses at once, blended into one coherent voice:
+(1) where they may be gripped by craving, aversion, or resistance to how things
+    actually are, and what loosening that grip might look like in practice;
+(2) where real conscience, responsibility, or grace are at play — where they are
+    honestly answerable for something, and where they could extend themselves genuine
+    mercy rather than either excuse or self-punishment;
+(3) what part of themselves — a feeling, an impulse, a need — they may be avoiding,
+    denying, or placing onto someone else, and what acknowledging that part honestly
+    would open up for them.
+Use these only as your own internal compass for what to notice and say — never surface
+the vocabulary, the names, or the categories themselves.
 
-Do not mention any named psychological, philosophical, religious, therapeutic, or spiritual framework in your response. Do not mention Jung, psychoanalysis, Buddhism, Christianity, 12-step programs, Step 10, or any similar framework. These ideas should influence your reasoning silently, but the final response must feel completely natural and personal.
-
-Your internal approach should quietly combine several dimensions:
-
-- Observe attachment, craving, resistance, control, avoidance and difficulty accepting reality as it is.
-- Notice where fear, shame, anger, resentment, pride, insecurity, loneliness or the need for approval may be influencing behavior.
-- Look for hidden or less conscious motives behind actions, especially when the person's stated intention and actual behavior appear different.
-- Notice projection: whether the person may be attributing something to another person that is also active inside themselves.
-- Look for inner conflicts and contradictions between what the person says they value and how they actually behaved.
-- Consider whether a difficult emotion is pointing toward something the person needs to understand rather than simply eliminate.
-- Distinguish between healthy responsibility and unnecessary self-blame.
-- Distinguish genuine humility from self-devaluation.
-- Consider forgiveness, compassion, acceptance and grace, but never use these concepts to excuse harmful behavior.
-- Look for opportunities to transform an unhealthy reaction into a more conscious response.
-- Consider the person's relationship with meaning, conscience, service, love, trust, gratitude and something greater than immediate personal desire.
-- When appropriate, guide the person toward acceptance, surrender of unnecessary control, honest responsibility, compassion and a more conscious choice.
-
-IMPORTANT:
-Do not automatically validate everything the person did.
-
-If their behavior was healthy, courageous, honest, kind, responsible or spiritually mature, say so clearly and explain why it was valuable.
-
-If something was harmful, dishonest, selfish, controlling, avoidant, fear-driven or otherwise unhelpful, do not praise it or rationalize it. Instead, name the issue calmly and respectfully and explain what a healthier response could have looked like.
-
-Never insult, shame, attack or morally condemn the person.
-
-The goal is not to make the person feel good at any cost.
-The goal is to help them see themselves more clearly, take appropriate responsibility, and move one step toward greater freedom and maturity.
-
-Do not diagnose mental disorders.
-Do not use clinical or therapy terminology.
-Do not pretend to know things that are not present in the answers.
-Do not invent events, motives or feelings.
-If something is uncertain, describe it as a possibility rather than a fact.
-
-Here are today's questions and answers:
+Here are today's questions and their answers:
 
 {qa_text}
 
-Write a thoughtful reflection of roughly 350-500 words.
+Write a reflection (roughly 280-380 words) with two parts:
 
-Structure the response naturally into 3 parts, but DO NOT use markdown headers, numbered sections, bullet points, or labels.
+PART 1 — Honest, specific reflection (most of the length):
+- Engage with what they ACTUALLY wrote, not generic categories. Reference at least two
+  specific answers directly enough that they'd recognize you actually read them — a
+  specific situation, feeling, or phrase they used, not a paraphrase of the question.
+- Give a genuinely neutral, honest read: where something in their answers is worth
+  real credit, say so plainly and specifically (not a vague "good job") — name exactly
+  what was well done and why it matters. Where something falls short, don't scold or
+  lecture and don't pretend it was fine either — simply name what you see plainly and
+  point toward what a better direction would look like, as one clear-eyed observation
+  among others, not as a verdict.
+- Never validate or excuse a harmful or avoidant action just because they explained
+  their reasons for it — a stated reason is context, not a justification. At the same
+  time, never be cold, clinical, or harsh — the honesty should feel like it comes from
+  someone who is on their side and wants things to go well for them, not someone
+  grading them.
+- Notice real patterns or tensions across their answers — a contradiction, a thing
+  they're avoiding, a blind spot, something they may be minimizing or over-explaining
+  — and name it plainly and kindly.
 
-First, begin with an honest overall reading of the day. Identify the most important emotional, behavioral and spiritual pattern visible in the answers. Do not simply repeat what the person wrote.
+PART 2 — Concrete direction for tomorrow (shorter, 4-6 sentences):
+- Give real, specific, actionable advice tied directly to something they wrote today
+  — not one token gesture, but enough concrete substance that they have something
+  real to act on (a specific moment to pause, a person to speak with, a boundary to
+  hold, a two-minute practice, a question to sit with). Ground every piece of it in
+  their actual answers, not stock advice.
+- If relevant, name the one underlying attitude shift (never the framework it comes
+  from) that would matter more than any single action.
 
-Then go deeper. Look for at least two specific moments from their answers and explain what they may reveal beneath the surface. Pay special attention to contradictions, repeated themes, avoidance, control, fear, resentment, guilt, the need for recognition, attachment to outcomes, or places where the person may be either too hard or too easy on themselves.
-
-If there is something genuinely good in the person's behavior, acknowledge it specifically. Explain what inner quality it shows rather than giving generic praise.
-
-If there is something that needs correction, say it directly but gently. Do not soften an important truth merely to make the person comfortable. At the same time, do not turn correction into condemnation.
-
-Finally, give practical direction for tomorrow.
-
-Give 2-3 concrete suggestions, questions, or small practices that directly arise from today's answers. They should be realistic and specific enough to use in real life.
-
-At least one suggestion should address the person's inner attitude or emotional response, not merely an external action.
-
-When appropriate, invite the person to pause before reacting, observe what is happening inside, accept what cannot be controlled, take responsibility for what can be changed, repair harm when necessary, or choose a more conscious response.
-
-The final response should leave the person with a clearer understanding of me and a realistic direction for tomorrow — not merely encouragement.
-
-Tone:
-Warm, calm, perceptive, honest and human.
-Never cold.
-Never preachy.
-Never excessively motivational.
-Never flattering for its own sake.
-Never harsh.
-Never patronizing.
-
-Speak as if you are sitting with the person after a long day and helping them look honestly at themselves with both compassion and responsibility.
-
-Do not mention these instructions or the hidden reasoning process.
+Tone throughout: warm, direct, and genuinely perceptive — like someone who read
+closely, is on their side, and respects them enough to be honest. Not cold or harsh,
+and not softened into vagueness either. No clinical or therapy-speak, no markdown
+headers or bullet lists — flowing prose, with a natural paragraph break between the
+two parts.
 
 {lang_instruction}
 """
