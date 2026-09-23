@@ -152,6 +152,20 @@ def save_keyboard(lang: str) -> InlineKeyboardMarkup:
     )
 
 
+def result_keyboard(lang: str) -> InlineKeyboardMarkup:
+    """AI ანალიზის წარმატებული შედეგის შემდეგ ნაჩვენები keyboard — "AI-ს
+    ანალიზი" ღილაკი განზრახ რჩება ხელმისაწვდომი, რომ მომხმარებელს
+    შეეძლოს ხელახლა გაუშვას ანალიზი იმავე პასუხებზე (მაგ. ტესტირებისას,
+    ან უბრალოდ თუ სურს ახალი AI-პასუხის მიღება)."""
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton(T.BTN_AI[lang], callback_data="ai_analysis")],
+            [InlineKeyboardButton(T.BTN_SAVE[lang], callback_data="save")],
+            [InlineKeyboardButton(T.BTN_FINISH[lang], callback_data="close_now")],
+        ]
+    )
+
+
 async def send_question_view(update_msg, lang: str, session: dict):
     """ბოტის ერთი შეტყობინების რედაქტირება: ისტორია + შემდეგი კითხვა + Skip."""
     qidx = session["current_q"]
@@ -214,6 +228,17 @@ def schedule_delete(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_id
         data={"chat_id": chat_id, "message_ids": message_ids, "lang": lang},
         name=f"delete_{chat_id}_{message_ids[0]}",
     )
+
+
+def reschedule_delete(context: ContextTypes.DEFAULT_TYPE, chat_id: int, message_ids: list[int], lang: str):
+    """აუქმებს ძველ, დაგეგმილ წაშლას (თუ არსებობს) და ხელახლა ნიშნავს
+    ვადას თავიდან — გამოიყენება, როცა მომხმარებელი ისევ აქტიურად
+    მუშაობს გვერდზე (მაგ. AI ანალიზს ხელახლა ითხოვს), რომ გვერდი
+    ნაადრევად არ წაიშალოს."""
+    job_name = f"delete_{chat_id}_{message_ids[0]}"
+    for j in context.job_queue.get_jobs_by_name(job_name):
+        j.schedule_removal()
+    schedule_delete(context, chat_id, message_ids, lang)
 
 
 # ---------- ბრძანებები ----------
@@ -313,7 +338,15 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "ai_analysis":
-        await _finalize(update, context, ai=True)
+        # პირველი დაჭერა: აქტიური session-ია (კითხვები ახლახან დასრულდა) —
+        # ჩვეულებრივი დასრულება/ანალიზი. ხელახალი დაჭერა (session უკვე
+        # "last_session"-ზეა გადატანილი პირველი დასრულებისას): იმავე
+        # პასუხებზე ხელახლა ვითხოვთ AI-ს ანალიზს, session-ს ხელახლა არ
+        # ვაფინალებთ და სტატისტიკის თვლას არ ვიმეორებთ.
+        if context.user_data.get("session"):
+            await _finalize(update, context, ai=True)
+        else:
+            await _reanalyze(update, context)
         return
 
     if data == "save":
@@ -398,7 +431,6 @@ async def _record_answer(update: Update, context: ContextTypes.DEFAULT_TYPE, ans
             pass
 
     session["current_q"] += 1
-    bot_msg = await context.bot.get_chat(session["chat_id"])  # placeholder not used
     chat_id = session["chat_id"]
     bot_msg_id = session["bot_msg_id"]
 
@@ -445,10 +477,14 @@ async def _finalize(update: Update, context: ContextTypes.DEFAULT_TYPE, ai: bool
             return
         session["ai_text"] = ai_text
         final_text = f"{transcript}\n\n🤖 {ai_text}{T.WILL_DELETE_SOON[lang]}"
+        # წარმატებული ანალიზის შემდეგაც "🤖 AI-ს ანალიზი" ღილაკი რჩება —
+        # რომ საჭიროების შემთხვევაში ხელახლა გაუშვათ იმავე პასუხებზე.
+        keyboard = result_keyboard(lang)
     else:
         final_text = f"{transcript}\n\n{T.FINISHED_PLAIN[lang]}{T.WILL_DELETE_SOON[lang]}"
+        keyboard = save_keyboard(lang)
 
-    await query.message.edit_text(final_text, reply_markup=save_keyboard(lang))
+    await query.message.edit_text(final_text, reply_markup=keyboard)
 
     context.user_data["last_session"] = session
     all_msg_ids = [session["bot_msg_id"]] + session["user_msg_ids"]
@@ -456,6 +492,40 @@ async def _finalize(update: Update, context: ContextTypes.DEFAULT_TYPE, ai: bool
 
     context.user_data.pop("session", None)
     context.user_data["awaiting_answer"] = False
+
+
+async def _reanalyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """"🤖 AI-ს ანალიზი" ღილაკზე ხელახალი დაჭერა უკვე დასრულებულ
+    სესიაზე — ხელახლა ვითხოვთ AI-ს პასუხს იმავე კითხვა-პასუხებზე
+    (stats-ის თვლას აქ არ ვიმეორებთ, რადგან ეს იგივე სესიის გაგრძელებაა,
+    არა ახალი დღიური ანალიზი)."""
+    query = update.callback_query
+    session = context.user_data.get("last_session")
+    if not session:
+        return
+    lang = get_lang(context) or "ka"
+    transcript = render_transcript_plain(lang, session["answers"])
+    chat_id = session["chat_id"]
+    msg_ids = [session["bot_msg_id"]] + session["user_msg_ids"]
+
+    await query.message.edit_text(f"{transcript}\n\n{T.ANALYZING[lang]}")
+    prompt = T.build_ai_prompt(lang, session["answers"])
+    ai_text = await get_ai_analysis(prompt)
+
+    if ai_text is None:
+        await query.message.edit_text(
+            f"{transcript}\n\n{T.AI_UNAVAILABLE[lang]}",
+            reply_markup=result_keyboard(lang),
+        )
+        return
+
+    session["ai_text"] = ai_text
+    final_text = f"{transcript}\n\n🤖 {ai_text}{T.WILL_DELETE_SOON[lang]}"
+    await query.message.edit_text(final_text, reply_markup=result_keyboard(lang))
+
+    # მომხმარებელი ისევ აქტიურად მუშაობს გვერდზე — ვახანგრძლივებთ
+    # ავტომატური წაშლის 15-წუთიან ვადას თავიდან.
+    reschedule_delete(context, chat_id, msg_ids, lang)
 
 
 # ---------- გაშვება ----------
