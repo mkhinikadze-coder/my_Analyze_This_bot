@@ -41,6 +41,20 @@ BTN_LANG_CHANGE = {"ka": "🌐 ენის შეცვლა", "ru": "🌐 С�
 BTN_RANDOM = {"ka": "🎯 შერჩევითი 7 კითხვა", "ru": "🎯 7 случайных вопросов", "en": "🎯 7 random questions"}
 BTN_REMINDER_ON = {"ka": "🔔 შეხსენების ჩართვა", "ru": "🔔 Включить напоминание", "en": "🔔 Turn reminder on"}
 BTN_REMINDER_OFF = {"ka": "🔕 შეხსენების გამორთვა", "ru": "🔕 Выключить напоминание", "en": "🔕 Turn reminder off"}
+BTN_TOMORROW = {"ka": "📌 კითხვა ხვალისთვის", "ru": "📌 Вопрос на завтра", "en": "📌 Question for tomorrow"}
+BTN_BACK = {"ka": "↩️ უკან", "ru": "↩️ Назад", "en": "↩️ Back"}
+
+TOMORROW_PROMPT = {
+    "ka": "📌 აირჩიე ერთი კითხვა, რომელიც ხვალინდელ ანალიზში გაგიმეორდება (დააჭირე შესაბამის ნომერს):",
+    "ru": "📌 Выбери один вопрос, который повторится в завтрашнем анализе (нажми нужный номер):",
+    "en": "📌 Pick one question to repeat in tomorrow's analysis (tap its number):",
+}
+
+TOMORROW_SAVED = {
+    "ka": "📌 მზადაა! ხვალინდელი ანალიზის პირველი კითხვა იქნება:\n\n{question}",
+    "ru": "📌 Готово! Первым вопросом завтрашнего анализа будет:\n\n{question}",
+    "en": "📌 Done! The first question of tomorrow's analysis will be:\n\n{question}",
+}
 
 CHOOSE_LANG = {
     "ka": "გამარჯობა! აირჩიე ენა 👇",
