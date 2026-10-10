@@ -7,6 +7,7 @@
 import logging
 import os
 import random
+import re
 import threading
 from datetime import time as dtime, timedelta
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -42,7 +43,8 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 DELETE_AFTER_SECONDS = 15 * 60  # 15 წუთი
-RANDOM_QUESTION_COUNT = 7  # "🎯 შერჩევითი კითხვები" რეჟიმზე რამდენი აირჩევა 46-დან
+RANDOM_QUESTION_COUNT = 7  # "🎯 შერჩევითი 7 კითხვა" რეჟიმზე რამდენი აირჩევა საცავიდან
+CARRY_MARK = "📌 "  # "ხვალისთვის დატოვებული" კითხვის ნიშანი
 REMINDER_HOUR = int(os.environ.get("REMINDER_HOUR", "21"))
 REMINDER_MINUTE = int(os.environ.get("REMINDER_MINUTE", "0"))
 PERSISTENCE_PATH = os.environ.get("PERSISTENCE_PATH", "bot_persistence.pickle")
@@ -147,6 +149,7 @@ def save_keyboard(lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
             [InlineKeyboardButton(T.BTN_SAVE[lang], callback_data="save")],
+            [InlineKeyboardButton(T.BTN_TOMORROW[lang], callback_data="tomorrow")],
             [InlineKeyboardButton(T.BTN_FINISH[lang], callback_data="close_now")],
         ]
     )
@@ -161,9 +164,142 @@ def result_keyboard(lang: str) -> InlineKeyboardMarkup:
         [
             [InlineKeyboardButton(T.BTN_AI[lang], callback_data="ai_analysis")],
             [InlineKeyboardButton(T.BTN_SAVE[lang], callback_data="save")],
+            [InlineKeyboardButton(T.BTN_TOMORROW[lang], callback_data="tomorrow")],
             [InlineKeyboardButton(T.BTN_FINISH[lang], callback_data="close_now")],
         ]
     )
+
+
+def tomorrow_picker_keyboard(lang: str, count: int) -> InlineKeyboardMarkup:
+    """ნომრიანი ღილაკები (1, 2, 3...) — კითხვების სრული ტექსტი შეტყობინებაშია,
+    რადგან გრძელი კითხვა ღილაკზე არ ეტევა."""
+    rows = []
+    row = []
+    for i in range(count):
+        row.append(InlineKeyboardButton(str(i + 1), callback_data=f"tq:{i}"))
+        if len(row) == 5:
+            rows.append(row)
+            row = []
+    if row:
+        rows.append(row)
+    rows.append([InlineKeyboardButton(T.BTN_BACK[lang], callback_data="tq_back")])
+    return InlineKeyboardMarkup(rows)
+
+
+# ---------- კითხვების შერჩევა (დუბლიკატების გარეშე) + "კითხვა ხვალისთვის" ----------
+
+def _norm(text: str) -> str:
+    """ტექსტის გასწორება შედარებისთვის: პატარა ასოები, სასვენი ნიშნებისა და
+    ზედმეტი გამოტოვებების გარეშე."""
+    return re.sub(r"[\W_]+", " ", text.lower()).strip()
+
+
+def _similar(a: str, b: str) -> bool:
+    """True, თუ ორი კითხვა ერთი და იგივეა, ან ერთი მეორის ნაწილია
+    (მაგ. "ვიყავი თუ არა დღეს ბედნიერი?" და "ვიყავი თუ არა დღეს
+    ბედნიერი? თუ არა, რა არ მყოფნის?")."""
+    na, nb = _norm(a), _norm(b)
+    if not na or not nb:
+        return False
+    return na == nb or na in nb or nb in na
+
+
+def _dedupe_pool_indices(pool: list[str]) -> list[int]:
+    """აბრუნებს საცავის იმ კითხვების ინდექსებს, რომლებიც არ მეორდება:
+    ზუსტი დუბლიკატებიდან რჩება პირველი, ხოლო კითხვა, რომელიც სხვა,
+    უფრო სრული კითხვის ნაწილია, გამოირიცხება."""
+    norms = [_norm(q) for q in pool]
+    keep = []
+    for i, n in enumerate(norms):
+        drop = False
+        for j, m in enumerate(norms):
+            if i == j:
+                continue
+            if n == m and j < i:
+                drop = True
+                break
+            if n != m and n in m:
+                drop = True
+                break
+        if not drop:
+            keep.append(i)
+    return keep
+
+
+def _question_text(lang: str, source: str, idx: int) -> str | None:
+    try:
+        if source == "fixed":
+            return T.QUESTIONS[lang][idx]
+        if source == "random":
+            return T.RANDOM_POOL[lang][idx]
+    except (IndexError, KeyError, TypeError):
+        pass
+    return None
+
+
+def build_session_questions(lang: str, mode: str, carry) -> tuple[list[str], list[tuple], bool]:
+    """აბრუნებს (კითხვების ტექსტებს, მათ "მისამართებს", ხვალისთვის დატოვებული
+    კითხვა გამოვიყენეთ თუ არა). "მისამართი" = ("fixed"|"random", ინდექსი) —
+    ენაზე დამოუკიდებელია, რომ დატოვებული კითხვა ენის შეცვლის შემდეგაც იპოვოს."""
+    carried_text = None
+    if carry:
+        carried_text = _question_text(lang, carry[0], carry[1])
+
+    if mode == "fixed":
+        questions = list(T.QUESTIONS[lang])
+        refs = [("fixed", i) for i in range(len(questions))]
+        if carried_text and not any(_similar(carried_text, q) for q in questions):
+            questions.insert(0, CARRY_MARK + carried_text)
+            refs.insert(0, (carry[0], carry[1]))
+        return questions, refs, carried_text is not None
+
+    pool = T.RANDOM_POOL[lang]
+    candidates = _dedupe_pool_indices(pool)
+    if carried_text:
+        candidates = [i for i in candidates if not _similar(pool[i], carried_text)]
+        picked = random.sample(candidates, RANDOM_QUESTION_COUNT - 1)
+        questions = [CARRY_MARK + carried_text] + [pool[i] for i in picked]
+        refs = [(carry[0], carry[1])] + [("random", i) for i in picked]
+    else:
+        picked = random.sample(candidates, RANDOM_QUESTION_COUNT)
+        questions = [pool[i] for i in picked]
+        refs = [("random", i) for i in picked]
+    return questions, refs, carried_text is not None
+
+
+def new_session(context: ContextTypes.DEFAULT_TYPE, query, lang: str, mode: str) -> dict:
+    questions, refs, carried = build_session_questions(
+        lang, mode, context.user_data.get("carry_question")
+    )
+    return {
+        "answers": [],
+        "current_q": 0,
+        "bot_msg_id": query.message.message_id,
+        "user_msg_ids": [],
+        "extra_msg_ids": [],
+        "chat_id": query.message.chat_id,
+        "ai_text": None,
+        "questions": questions,
+        "refs": refs,
+        "carried": carried,
+    }
+
+
+def all_session_msg_ids(session: dict) -> list[int]:
+    return [session["bot_msg_id"]] + session["user_msg_ids"] + session.get("extra_msg_ids", [])
+
+
+def track_for_deletion(context: ContextTypes.DEFAULT_TYPE, session: dict, message_id: int):
+    """ახალ დამხმარე შეტყობინებას ვამატებთ უკვე დაგეგმილ ავტომატურ წაშლაში."""
+    session.setdefault("extra_msg_ids", []).append(message_id)
+    job_name = f"delete_{session['chat_id']}_{session['bot_msg_id']}"
+    for j in context.job_queue.get_jobs_by_name(job_name):
+        j.data["message_ids"].append(message_id)
+
+
+def prompt_pairs(session: dict) -> list[tuple[str, str]]:
+    """AI-სთვის გასაგზავნი კითხვა-პასუხები (📌 ნიშნის გარეშე)."""
+    return [(q.removeprefix(CARRY_MARK), a) for q, a in session["answers"]]
 
 
 async def send_question_view(update_msg, lang: str, session: dict):
@@ -302,29 +438,13 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = get_lang(context) or "ka"
 
     if data == "start_analysis":
-        context.user_data["session"] = {
-            "answers": [],
-            "current_q": 0,
-            "bot_msg_id": query.message.message_id,
-            "user_msg_ids": [],
-            "chat_id": query.message.chat_id,
-            "ai_text": None,
-            "questions": list(T.QUESTIONS[lang]),
-        }
+        context.user_data["session"] = new_session(context, query, lang, "fixed")
         context.user_data["awaiting_answer"] = True
         await send_question_view(query.message, lang, context.user_data["session"])
         return
 
     if data == "start_random":
-        context.user_data["session"] = {
-            "answers": [],
-            "current_q": 0,
-            "bot_msg_id": query.message.message_id,
-            "user_msg_ids": [],
-            "chat_id": query.message.chat_id,
-            "ai_text": None,
-            "questions": random.sample(T.RANDOM_POOL[lang], RANDOM_QUESTION_COUNT),
-        }
+        context.user_data["session"] = new_session(context, query, lang, "random")
         context.user_data["awaiting_answer"] = True
         await send_question_view(query.message, lang, context.user_data["session"])
         return
@@ -360,11 +480,46 @@ async def on_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer(T.SAVED_CONFIRM[lang], show_alert=True)
         return
 
+    if data == "tomorrow":
+        # "📌 კითხვა ხვალისთვის": ვაჩვენებთ დღევანდელ კითხვებს ნომრებით და
+        # მომხმარებელი ირჩევს ერთს, რომელიც ხვალინდელ ანალიზში გამეორდება.
+        session = context.user_data.get("last_session")
+        if session and session.get("refs"):
+            lines = [f"{i + 1}. {q}" for i, q in enumerate(session["questions"])]
+            text = f"{T.TOMORROW_PROMPT[lang]}\n\n" + "\n\n".join(lines)
+            msg = await context.bot.send_message(
+                chat_id=session["chat_id"],
+                text=text,
+                reply_markup=tomorrow_picker_keyboard(lang, len(session["questions"])),
+            )
+            track_for_deletion(context, session, msg.message_id)
+        return
+
+    if data.startswith("tq:"):
+        session = context.user_data.get("last_session")
+        try:
+            i = int(data.split(":", 1)[1])
+        except ValueError:
+            return
+        if session and 0 <= i < len(session.get("refs", [])):
+            source, idx = session["refs"][i]
+            context.user_data["carry_question"] = (source, idx)
+            text = _question_text(lang, source, idx) or session["questions"][i].removeprefix(CARRY_MARK)
+            await query.message.edit_text(T.TOMORROW_SAVED[lang].format(question=text))
+        return
+
+    if data == "tq_back":
+        try:
+            await query.message.delete()
+        except TelegramError:
+            pass
+        return
+
     if data == "close_now":
         session = context.user_data.get("last_session")
         if session:
             chat_id = session["chat_id"]
-            msg_ids = [session["bot_msg_id"]] + session["user_msg_ids"]
+            msg_ids = all_session_msg_ids(session)
             # ვაუქმებთ დაგეგმილ (15-წუთიან) ავტომატურ წაშლას, რადგან ახლავე,
             # ხელით ვასრულებთ იმავე მოქმედებას.
             job_name = f"delete_{chat_id}_{msg_ids[0]}"
@@ -467,7 +622,7 @@ async def _finalize(update: Update, context: ContextTypes.DEFAULT_TYPE, ai: bool
 
     if ai:
         await query.message.edit_text(f"{transcript}\n\n{T.ANALYZING[lang]}")
-        prompt = T.build_ai_prompt(lang, session["answers"])
+        prompt = T.build_ai_prompt(lang, prompt_pairs(session))
         ai_text = await get_ai_analysis(prompt)
         if ai_text is None:
             await query.message.edit_text(
@@ -486,9 +641,13 @@ async def _finalize(update: Update, context: ContextTypes.DEFAULT_TYPE, ai: bool
 
     await query.message.edit_text(final_text, reply_markup=keyboard)
 
+    # ხვალისთვის დატოვებული კითხვა ამ ანალიზში უკვე გამოვიყენეთ — ვასუფთავებთ,
+    # რომ ხვალზე მეტად არ გადავიდეს (თუ მომხმარებელი ახალს არ აირჩევს).
+    if session.get("carried"):
+        context.user_data.pop("carry_question", None)
+
     context.user_data["last_session"] = session
-    all_msg_ids = [session["bot_msg_id"]] + session["user_msg_ids"]
-    schedule_delete(context, session["chat_id"], all_msg_ids, lang)
+    schedule_delete(context, session["chat_id"], all_session_msg_ids(session), lang)
 
     context.user_data.pop("session", None)
     context.user_data["awaiting_answer"] = False
@@ -506,10 +665,9 @@ async def _reanalyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
     lang = get_lang(context) or "ka"
     transcript = render_transcript_plain(lang, session["answers"])
     chat_id = session["chat_id"]
-    msg_ids = [session["bot_msg_id"]] + session["user_msg_ids"]
 
     await query.message.edit_text(f"{transcript}\n\n{T.ANALYZING[lang]}")
-    prompt = T.build_ai_prompt(lang, session["answers"])
+    prompt = T.build_ai_prompt(lang, prompt_pairs(session))
     ai_text = await get_ai_analysis(prompt)
 
     if ai_text is None:
@@ -525,7 +683,7 @@ async def _reanalyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # მომხმარებელი ისევ აქტიურად მუშაობს გვერდზე — ვახანგრძლივებთ
     # ავტომატური წაშლის 15-წუთიან ვადას თავიდან.
-    reschedule_delete(context, chat_id, msg_ids, lang)
+    reschedule_delete(context, chat_id, all_session_msg_ids(session), lang)
 
 
 # ---------- გაშვება ----------
